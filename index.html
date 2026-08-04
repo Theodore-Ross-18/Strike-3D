@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>STRIKE 3D - Tactical Base Builder & Raiding Operations</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  
+  <!-- Three.js Engine & OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <!-- Firebase JS SDK (App & Firestore Compatibility) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <!-- Sci-Fi Loading Screen Overlay -->
+  <div id="loading-screen">
+    <div class="loading-content">
+      <div class="loading-logo">
+        <span class="icon">⚡</span>
+        <h1>STRIKE 3D</h1>
+      </div>
+      <div class="loading-spinner-ring"></div>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+      </div>
+      <div class="loading-status" id="loading-status-text">INITIALIZING 3D WEBGL ENGINE...</div>
+    </div>
+  </div>
+
+  <!-- Account Creation / Login Screen Backdrop -->
+  <div class="modal-backdrop hidden" id="account-modal">
+    <div class="modal-content glass-panel account-card">
+      <div class="modal-header center">
+        <h2>🛡️ STRIKE COMMANDER REGISTRATION</h2>
+      </div>
+      <div class="modal-body center">
+        <p style="color:#8b949e; text-align:center;">Create your Commander profile to save your 3D base, army, & research progress across devices.</p>
+        <form id="account-form" style="width: 100%; display: flex; flex-direction: column; gap: 14px;">
+          <div class="form-group">
+            <label style="font-family: Orbitron; font-size: 0.8rem; color: #00f0ff;">COMMANDER CALLSIGN / USERNAME:</label>
+            <input type="text" id="input-username" placeholder="e.g. Commander_Apex" required maxlength="18" style="width:100%; padding:10px 14px; background:rgba(0,0,0,0.5); border:1px solid rgba(0,240,255,0.4); border-radius:8px; color:#fff; font-family:Rajdhani; font-size:1.1rem; font-weight:700; outline:none;">
+          </div>
+          <div class="form-group">
+            <label style="font-family: Orbitron; font-size: 0.8rem; color: #00f0ff;">FACTION ALLIANCE:</label>
+            <select id="input-faction" style="width:100%; padding:10px 14px; background:rgba(14,22,38,0.9); border:1px solid rgba(0,240,255,0.4); border-radius:8px; color:#fff; font-family:Rajdhani; font-size:1rem; font-weight:700; outline:none;">
+              <option value="Cyber Syndicate">🤖 Cyber Syndicate (Tech Bonus)</option>
+              <option value="Plasma Vanguard">⚡ Plasma Vanguard (Offense Bonus)</option>
+              <option value="Iron Mech Corps">🛡️ Iron Mech Corps (Defense Bonus)</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-large" style="width:100%; justify-content:center; margin-top:10px;">INITIALIZE BASE COMMAND</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Raid Mode Choice Modal (AI Bot vs Active Players) -->
+  <div class="modal-backdrop hidden" id="raid-mode-modal">
+    <div class="modal-content glass-panel" style="max-width: 650px;">
+      <div class="modal-header">
+        <h2>⚔️ SELECT RAID OPERATION MODE</h2>
+        <button class="btn-close" id="btn-close-raid-mode">&times;</button>
+      </div>
+      <div class="modal-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+        <!-- Option 1: AI Bot Outposts -->
+        <div class="shop-item-card" style="align-items: center; text-align: center; padding: 20px;">
+          <div class="icon" style="font-size: 3rem;">🤖</div>
+          <div class="title" style="font-size: 1.2rem; color: var(--primary-cyan);">AI BOT OUTPOSTS</div>
+          <div class="desc" style="margin: 8px 0;">Raid automated computer defense outposts. Great for practicing tactics and quick resource harvesting.</div>
+          <button class="btn btn-primary btn-large" id="btn-raid-bot" style="width: 100%; justify-content: center;">🤖 RAID AI BOTS</button>
+        </div>
+
+        <!-- Option 2: Active Player Bases -->
+        <div class="shop-item-card" style="align-items: center; text-align: center; padding: 20px; border-color: var(--accent-gold);">
+          <div class="icon" style="font-size: 3rem;">⚔️</div>
+          <div class="title" style="font-size: 1.2rem; color: var(--accent-gold);">ACTIVE PLAYER BASES</div>
+          <div class="desc" style="margin: 8px 0;">Raid real Commander bases!<br><strong style="color: var(--accent-plasma);" id="active-players-count-label">🔥 FIREBASE PLAYERS: 14 ONLINE</strong></div>
+          <button class="btn btn-warning btn-large" id="btn-raid-player" style="width: 100%; justify-content: center;">⚔️ FIND PLAYER BASE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="app-container">
+    <!-- Top HUD Header -->
+    <header id="hud-header">
+      <div class="brand-badge">
+        <span class="logo-icon">⚡</span>
+        <span class="brand-title">STRIKE 3D</span>
+        <span class="mode-badge" id="current-mode-label">BASE COMMAND</span>
+      </div>
+
+      <div class="resource-bar">
+        <div class="resource-card credits" id="res-credits-card">
+          <div class="res-icon">💎</div>
+          <div class="res-info">
+            <div class="res-label">CREDITS</div>
+            <div class="res-value" id="credits-amount">1,000</div>
+            <div class="res-progress-track">
+              <div class="res-progress-fill" id="credits-bar" style="width: 50%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="resource-card plasma" id="res-plasma-card">
+          <div class="res-icon">⚡</div>
+          <div class="res-info">
+            <div class="res-label">PLASMA</div>
+            <div class="res-value" id="plasma-amount">1,000</div>
+            <div class="res-progress-track">
+              <div class="res-progress-fill" id="plasma-bar" style="width: 50%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="resource-card builders">
+          <div class="res-icon">👷</div>
+          <div class="res-info">
+            <div class="res-label">BUILDERS</div>
+            <div class="res-value" id="builders-amount">2 / 2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Time of Day Selector -->
+      <div class="time-of-day-bar">
+        <button class="tod-btn active" id="tod-morning" title="Morning Lighting">🌅 MORNING</button>
+        <button class="tod-btn" id="tod-noon" title="Noon Lighting">☀️ NOON</button>
+        <button class="tod-btn" id="tod-night" title="Night Lighting">🌙 NIGHT</button>
+      </div>
+
+      <!-- Audio Controls Bar -->
+      <div class="audio-controls-bar">
+        <button class="btn btn-audio" id="btn-toggle-audio" title="Toggle Sound FX">🔊 SFX ON</button>
+        <div class="volume-slider-box">
+          <span class="vol-icon">🔉</span>
+          <input type="range" id="audio-volume-slider" min="0" max="100" value="70">
+        </div>
+      </div>
+
+      <div class="hud-actions">
+        <button class="btn btn-warning" id="btn-profile" title="View Profile">👤 <span id="hud-username">COMMANDER</span></button>
+        <button class="btn btn-secondary" id="btn-reset-cam">🎥 RESET CAM</button>
+        <button class="btn btn-secondary" id="btn-save-game">💾 SAVE</button>
+      </div>
+    </header>
+
+    <!-- Main Game Viewport Canvas Container -->
+    <main id="viewport-container">
+      <div id="three-canvas-container"></div>
+      
+      <!-- 3D Projected Floating Labels & Healthbars Overlay -->
+      <div id="floating-labels-container"></div>
+
+      <!-- Overlay Controls (Base Mode) -->
+      <div class="overlay-controls base-overlay" id="base-overlay">
+        <div class="action-dock">
+          <button class="dock-btn shop-btn" id="btn-open-shop">
+            <span class="icon">🏭</span>
+            <span class="text">BUILD SHOP</span>
+          </button>
+          <button class="dock-btn army-btn" id="btn-open-army">
+            <span class="icon">🎖️</span>
+            <span class="text">BARRACKS (<span id="army-capacity-count">0/20</span>)</span>
+          </button>
+          <button class="dock-btn lab-btn" id="btn-open-lab">
+            <span class="icon">🔬</span>
+            <span class="text">LAB RESEARCH</span>
+          </button>
+          <button class="dock-btn attack-btn" id="btn-start-attack">
+            <span class="icon">⚔️</span>
+            <span class="text">LAUNCH 3D RAID</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Overlay Controls (Battle Mode) -->
+      <div class="overlay-controls battle-overlay hidden" id="battle-overlay">
+        <div class="battle-stats-top">
+          <div class="battle-destruction-card">
+            <span class="label">DESTRUCTION</span>
+            <span class="percent" id="battle-destruction-percent">0%</span>
+            <div class="stars-container" id="battle-stars">
+              <span class="star far-star">★</span>
+              <span class="star far-star">★</span>
+              <span class="star far-star">★</span>
+            </div>
+          </div>
+          <div class="battle-timer" id="battle-timer">03:00</div>
+          <div class="battle-top-actions">
+            <button class="btn btn-primary" id="btn-next-base">🔍 NEXT BASE (💎 50)</button>
+            <button class="btn btn-danger" id="btn-retreat">🏳️ SURRENDER</button>
+          </div>
+        </div>
+
+        <!-- Tactical Battle Deployment Dock (Troops & Spells & Hero Ability) -->
+        <div class="battle-dock-bottom">
+          <!-- Hero Ability Trigger Button -->
+          <button class="hero-ability-btn hidden" id="btn-hero-ability">
+            <span class="icon">🛡️</span>
+            <span class="label">SHIELD OVERDRIVE</span>
+          </button>
+
+          <!-- Deployment Tabs Toggle -->
+          <div class="deploy-mode-selector">
+            <button class="deploy-tab active" id="tab-deploy-troops">🎖️ TROOPS</button>
+            <button class="deploy-tab" id="tab-deploy-spells">⚡ SPELLS</button>
+          </div>
+
+          <div class="troop-selector-bar" id="troop-selector-bar">
+            <!-- Dynamically populated troop or spell buttons -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Commander Profile Modal -->
+    <div class="modal-backdrop hidden" id="profile-modal">
+      <div class="modal-content glass-panel account-card">
+        <div class="modal-header">
+          <h2>👤 COMMANDER PROFILE & CLOUD</h2>
+          <button class="btn-close" id="btn-close-profile">&times;</button>
+        </div>
+        <div class="modal-body center">
+          <div class="profile-info-box" style="width:100%; background:rgba(0,0,0,0.4); border:1px solid var(--panel-border); border-radius:12px; padding:16px;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span>Callsign:</span> <strong id="profile-modal-username" style="color:var(--primary-cyan);">Commander</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+              <span>Alliance:</span> <strong id="profile-modal-faction" style="color:var(--accent-gold);">Cyber Syndicate</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span>Cloud Engine:</span> <strong style="color:var(--accent-plasma);">Firebase Firestore DB</strong>
+            </div>
+          </div>
+          <button class="btn btn-danger" id="btn-switch-account" style="width:100%; justify-content:center;">🔄 SWITCH / CREATE NEW ACCOUNT</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shop Modal -->
+    <div class="modal-backdrop hidden" id="shop-modal">
+      <div class="modal-content glass-panel">
+        <div class="modal-header">
+          <h2>STRIKE 3D ARCHITECTURE SHOP</h2>
+          <button class="btn-close" id="btn-close-shop">&times;</button>
+        </div>
+        <div class="modal-body shop-grid" id="shop-items-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Army Barracks Modal -->
+    <div class="modal-backdrop hidden" id="army-modal">
+      <div class="modal-content glass-panel">
+        <div class="modal-header">
+          <h2>TACTICAL 3D BARRACKS & HERO CHAMBER</h2>
+          <button class="btn-close" id="btn-close-army">&times;</button>
+        </div>
+        <div class="modal-body army-body">
+          <div class="army-capacity-header">
+            <span>HOUSING CAPACITY: <strong id="army-modal-housing">0 / 20</strong></span>
+            <button class="btn btn-warning" id="btn-clear-army">CLEAR ARMY</button>
+          </div>
+          <div class="troop-grid" id="troop-train-container">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Laboratory Tech Research Modal -->
+    <div class="modal-backdrop hidden" id="lab-modal">
+      <div class="modal-content glass-panel">
+        <div class="modal-header">
+          <h2>LABORATORY TECH RESEARCH CENTER</h2>
+          <button class="btn-close" id="btn-close-lab">&times;</button>
+        </div>
+        <div class="modal-body shop-grid" id="lab-research-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Building Selected Inspector Bar -->
+    <div class="inspector-panel hidden" id="inspector-panel">
+      <div class="inspector-info">
+        <h3 id="inspector-name">Gatling Turret</h3>
+        <p id="inspector-desc">Fires rapid plasma rounds at encroaching units.</p>
+        <div class="inspector-stats" id="inspector-stats"></div>
+      </div>
+      <div class="inspector-actions">
+        <button class="btn btn-primary" id="btn-upgrade-building">UPGRADE (💎 <span id="upgrade-cost">500</span>)</button>
+        <button class="btn btn-danger" id="btn-sell-building">SELL (+💎 <span id="sell-value">250</span>)</button>
+        <button class="btn btn-secondary" id="btn-close-inspector">CLOSE</button>
+      </div>
+    </div>
+
+    <!-- Battle End Result Modal -->
+    <div class="modal-backdrop hidden" id="battle-result-modal">
+      <div class="modal-content glass-panel result-card">
+        <div class="modal-header center">
+          <h1 id="result-title">VICTORY!</h1>
+        </div>
+        <div class="modal-body center">
+          <div class="stars-result" id="result-stars">
+            <span class="star-big">★</span>
+            <span class="star-big">★</span>
+            <span class="star-big">★</span>
+          </div>
+          <div class="result-stats">
+            <div class="result-row"><span>Destruction:</span> <strong id="result-destruction">100%</strong></div>
+            <div class="result-row"><span>Credits Looted:</span> <strong id="result-credits">+0</strong></div>
+            <div class="result-row"><span>Plasma Looted:</span> <strong id="result-plasma">+0</strong></div>
+          </div>
+          <button class="btn btn-primary btn-large" id="btn-return-base">RETURN TO BASE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Game Scripts -->
+  <script src="js/cloud_sync.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/models3d.js"></script>
+  <script src="js/three_engine.js"></script>
+  <script src="js/spells.js"></script>
+  <script src="js/buildings.js"></script>
+  <script src="js/units.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/battle.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
