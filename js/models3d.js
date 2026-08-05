@@ -1,44 +1,4 @@
 class ModelBuilder3D {
-  static initGLTFLoader() {
-    if (!this._gltfLoader && window.THREE && THREE.GLTFLoader) {
-      this._gltfLoader = new THREE.GLTFLoader();
-      this._loadedModelsCache = new Map();
-    }
-  }
-
-  // Support for loading Meshy.ai or custom GLTF/GLB models
-  static loadGLTFModel(url, onSuccess, onError = null) {
-    this.initGLTFLoader();
-
-    if (this._loadedModelsCache.has(url)) {
-      const cloned = this._loadedModelsCache.get(url).clone();
-      if (onSuccess) onSuccess(cloned);
-      return;
-    }
-
-    if (this._gltfLoader) {
-      this._gltfLoader.load(
-        url,
-        (gltf) => {
-          const model = gltf.scene;
-          model.traverse((child) => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-          });
-          this._loadedModelsCache.set(url, model);
-          if (onSuccess) onSuccess(model.clone());
-        },
-        undefined,
-        (err) => {
-          console.warn(`[GLTFLoader] Unable to load 3D model from ${url}, using procedural mesh fallback:`, err);
-          if (onError) onError(err);
-        }
-      );
-    }
-  }
-
   static generateMetalPlateTexture() {
     if (this._metalTex) return this._metalTex;
     const canvas = document.createElement('canvas');
@@ -169,32 +129,6 @@ class ModelBuilder3D {
 
   static createBuildingMesh(typeId, level = 1) {
     const group = new THREE.Group();
-
-    // Check if a Meshy 3D GLTF model exists in assets/models/
-    const assetMap = {
-      HQ: 'assets/models/hq.glb',
-      CREDIT_MINE: 'assets/models/mine.glb',
-      PLASMA_SYNTH: 'assets/models/plasma.glb',
-      GATLING: 'assets/models/gatling.glb',
-      PLASMA_CANNON: 'assets/models/cannon.glb',
-      BARRACKS: 'assets/models/barracks.glb',
-      LABORATORY: 'assets/models/lab.glb',
-      CLAN_HUB: 'assets/models/clan.glb',
-      BUILDER_HUT: 'assets/models/builder.glb',
-      TESLA: 'assets/models/tesla.glb',
-      LANDMINE: 'assets/models/mine_trap.glb',
-      WALL: 'assets/models/wall.glb'
-    };
-
-    const modelUrl = assetMap[typeId];
-    if (modelUrl) {
-      this.loadGLTFModel(modelUrl, (gltfMesh) => {
-        group.clear();
-        group.add(gltfMesh);
-      });
-    }
-
-    // High quality procedural 3D mesh fallback
     const metalTex = this.generateMetalPlateTexture();
     const energyTex = this.generateEnergyPatternTexture('#00f0ff');
     const concTex = this.generateConcreteTexture();
@@ -335,7 +269,7 @@ class ModelBuilder3D {
         const baseMat = new THREE.MeshStandardMaterial({ map: metalTex, color: 0xffffff, roughness: 0.5, metalness: 0.4 });
         const base = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.3, 1.8), baseMat);
         base.position.y = 0.15;
- base.castShadow = true;
+        base.castShadow = true;
         group.add(base);
 
         const pylonMat = new THREE.MeshStandardMaterial({ map: metalTex, color: 0x00ffaa, roughness: 0.3, metalness: 0.5 });
@@ -467,29 +401,13 @@ class ModelBuilder3D {
 
   static createUnitMesh(typeId) {
     const group = new THREE.Group();
-
-    const unitAssetMap = {
-      HERO_COMMANDER: 'assets/models/hero.glb',
-      ENFORCER: 'assets/models/enforcer.glb',
-      JUGGERNAUT: 'assets/models/juggernaut.glb',
-      SPECTRE: 'assets/models/spectre.glb',
-      DRONE: 'assets/models/drone.glb'
-    };
-
-    const modelUrl = unitAssetMap[typeId];
-    if (modelUrl) {
-      this.loadGLTFModel(modelUrl, (gltfMesh) => {
-        group.clear();
-        group.add(gltfMesh);
-      });
-    }
-
     const camoTex = this.generateDigitalCamoTexture();
     const metalTex = this.generateMetalPlateTexture();
     const energyTex = this.generateEnergyPatternTexture('#00ffaa');
 
     switch (typeId) {
       case 'HERO_COMMANDER': {
+        // Massive Strike Commander Mechlord
         const mat = new THREE.MeshStandardMaterial({ map: metalTex, color: 0xffd166, roughness: 0.2, metalness: 0.6 });
         const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.7), mat);
         torso.position.y = 0.6;
@@ -513,6 +431,7 @@ class ModelBuilder3D {
         group.add(arm1);
         group.add(arm2);
 
+        // Shield Overdrive Holographic Ring Mesh
         const shieldGeo = new THREE.SphereGeometry(1.2, 16, 16);
         const shieldMat = new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0, wireframe: true });
         const shieldMesh = new THREE.Mesh(shieldGeo, shieldMat);
